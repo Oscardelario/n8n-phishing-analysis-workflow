@@ -1,0 +1,595 @@
+{
+  "name": "Phishing_analysis",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "cd141477-4d2b-4d91-adfb-8e87474467b3",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -976,
+        896
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "test-giulio-public"
+        },
+        "text": "=*Email Analysis*\n\nSubject: {{ $('Microsoft Outlook').item.json[\"subject\"] }}\nFrom: {{ $('Microsoft Outlook').item.json[\"sender\"][\"emailAddress\"][\"address\"] }}\nDate: {{ $('Microsoft Outlook').item.json[\"sentDateTime\"] }}\n\nReport:\n\n*URLScan Report URL:* {{ $('urlscan.io').item.json.result ? $('urlscan.io').item.json.result : \"N/A\" }}\n*Virustotal report:* https://www.virustotal.com/gui/url/{{ $json[\"data\"][\"id\"].split(\"-\")[1] }}\n*Virustotal Verdict:* {{ $json.data.attributes.stats.malicious + $json.data.attributes.stats.suspicious }} / {{ Object.keys($json.data.attributes.results).length }}",
+        "otherOptions": {}
+      },
+      "id": "e21900f9-d1ed-4b8a-84b4-0aa1501c5f17",
+      "name": "sends slack message",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        560,
+        1568
+      ],
+      "typeVersion": 2,
+      "webhookId": "9ecc1f0d-8a6f-42f2-86a3-f6b9981825ca"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "fba0eda7-23d3-44f2-941c-fd0460225b59",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -112,
+        784
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "messageId": "={{ $json.id }}",
+        "updateFields": {
+          "isRead": true
+        }
+      },
+      "id": "c61bdc12-36e7-4474-bd53-76810ddbdc3a",
+      "name": "Mark as read",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "position": [
+        -400,
+        880
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.virustotal.com/api/v3/urls",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.domain }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "202927bd-31ca-4095-8462-d62a422e82d4",
+      "name": "VirusTotal: Scan URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        720,
+        1008
+      ],
+      "typeVersion": 4.1
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/analyses/{{ $json.data.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "resource",
+              "value": "https://developers.virustotal.com/v2.0/reference/url-report"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ff4e323b-a704-478a-9911-7f3eff8b2cbd",
+      "name": "VirusTotal: Get report",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        960,
+        1008
+      ],
+      "typeVersion": 4.1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "0bd447c9-033e-4c97-b61a-62042496f9a1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -976,
+        752
+      ],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "language": "python"
+      },
+      "id": "12279da9-bef9-468f-81df-94eaea59955c",
+      "name": "Find indicators of compromise",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        144,
+        768
+      ],
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "scanId": "={{ $json.scanId }}"
+      },
+      "id": "eacd359a-706d-4d8a-b4d5-23913077b8c9",
+      "name": "URLScan: Get report",
+      "type": "n8n-nodes-base.urlScanIo",
+      "position": [
+        1568,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.domain }}",
+        "additionalFields": {}
+      },
+      "id": "d58ff098-bbbe-481e-b6a3-d0e75fef173b",
+      "name": "URLScan: Scan URL",
+      "type": "n8n-nodes-base.urlScanIo",
+      "position": [
+        816,
+        400
+      ],
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.domain }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "da378f80-7b12-48b2-802b-fe1abdc0555a",
+      "name": "Has URL?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        384,
+        768
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.error }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "4b19ee83-1c14-468e-b831-226881564a2e",
+      "name": "No error?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1168,
+        400
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.data }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "c8ba87af-ce81-4274-8e6e-51514db79a45",
+      "name": "Not empty?",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        288,
+        1568
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![Scheduled](https://i.imgur.com/PcOuvAL.png)\n## Workflow\n\nEste flujo de trabajo de n8n está diseñado para mejorar las medidas de ciberseguridad mediante el análisis de posibles URLs de phishing utilizando URLScan.io y VirusTotal.\n\nEstá pensado para procesar y evaluar automáticamente URLs provenientes de mensajes entrantes en busca de contenido malicioso.\n\nEste flujo de trabajo está optimizado específicamente para Outlook, pero puedes reemplazar Outlook por el proveedor de correo que prefieras.\n\nEl flujo puede iniciarse de forma manual o programarse para ejecutarse automáticamente, garantizando revisiones consistentes contra amenazas de phishing. Al integrarse con herramientas líderes en ciberseguridad, proporciona un análisis completo, fortaleciendo la defensa de tu organización contra ataques de phishing.\n\n## Programación de Ejecución\n\nPuede activarse manualmente haciendo clic en \"Ejecutar flujo de trabajo\" o configurarse para ejecutarse según un horario establecido. Para adaptarlo a tus necesidades operativas, personaliza el Disparador de Programación (Schedule Trigger) con la frecuencia que prefieras, asegurando un monitoreo continuo frente a intentos de phishing.",
+        "height": 1008.8561536646063,
+        "width": 474.5187061049208
+      },
+      "id": "e40106ef-bf77-4811-a7a1-215c623493ad",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1136,
+        16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![Outlook](https://i.imgur.com/R3Bhd8I.png)\n## Análisis de phishing\nEste segmento del flujo de trabajo se conecta con Microsoft Outlook para recuperar y procesar todos los mensajes marcados como no leídos. Esta sección se puede reemplazar por cualquier otro proveedor de correo.\nUna vez que se obtiene un correo electrónico, el nodo “Obtener todos los mensajes no leídos” captura los detalles, mientras que el nodo “Marcar como leído” actualiza el estado del mensaje.\nEsto garantiza que cada correo se procese solo una vez, manteniendo la bandeja de entrada limpia y organizada, y evitando el reprocesamiento de los mismos mensajes.",
+        "height": 647.1076277970203,
+        "width": 397.3953488372091
+      },
+      "id": "201b8dc6-37f5-463e-a331-cb0ef5576dcf",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -640,
+        384
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![python](https://i.imgur.com/S2TZ3u6.png)\n## indicadores de compromiso\nEsta sección del flujo de trabajo utiliza el nodo “Split In Batches” de n8n, una función potente para el procesamiento iterativo. Está configurada para dividir el lote de correos electrónicos uno por uno, permitiendo un examen individual del contenido de cada mensaje en busca de posibles amenazas.\n\nCon el nodo “Find indicators of compromise”, el flujo de trabajo emplea código en Python para analizar el contenido del correo y extraer URLs, que son indicadores comunes de compromiso (IoCs) en intentos de phishing. Al utilizar la librería ioc-finder, se escanean sistemáticamente y se aíslan estos IoCs del cuerpo del correo.\n\nEl nodo “Has URL?” verifica si el correo contiene alguna URL. Si no se encuentran URLs, el ciclo pasa al siguiente correo, ya que no hay nada que escanear. Si encuentra alguna, permite que el correo continúe hacia las siguientes secciones.\n\nLa división en lotes es clave para la eficiencia del flujo de trabajo, permitiendo que el ciclo maneje grandes cantidades de correos de manera metódica. Este paso es crucial para identificar y extraer elementos sospechosos de cada correo, destacando el enfoque minucioso del flujo de trabajo en el análisis de seguridad.",
+        "height": 836.8098049558043,
+        "width": 859.9418604651164
+      },
+      "id": "aec8375a-4057-43af-97a9-c2c2737863c9",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -224,
+        288
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![urlscan](https://i.imgur.com/RjaMt6c.png)\n## Escaneo y verificación de URLs\nEsta parte del flujo de trabajo interactúa con URLScan.io, una herramienta para escanear y analizar sitios web en busca de posibles amenazas de seguridad.\n\nEl nodo “URLScan: Scan URL” inicia el proceso enviando la URL extraída del contenido del correo electrónico. Está configurado para continuar incluso si ocurre un error, lo que nos permite luego hacer una verificación de errores en el nodo “No error?”.\n\nEsto se debe a que, si el nodo “URLScan: Scan URL” falla, todo el flujo de trabajo se detendría. Esto no es conveniente, porque en teoría podríamos estar procesando otro correo después de este, y necesitamos asegurarnos de que el flujo continúe con el siguiente correo.\n\nTras el envío, el nodo “Wait 1 Minute” pausa el flujo de trabajo, dando a URLScan.io tiempo suficiente para realizar el escaneo y generar un informe. Esta espera garantiza que la recuperación posterior del informe refleje el análisis más reciente y completo.",
+        "height": 618.8295813953489,
+        "width": 1099.116279069767
+      },
+      "id": "a9adcc4e-6ce0-41b2-977f-e7a4276a507b",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        -48
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "id": "cc842d16-2e73-4df1-a1f1-875d383f8db9",
+      "name": "Wait 1 Minute",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1408,
+        336
+      ],
+      "webhookId": "469a8b5e-8b5a-4360-bc9d-3b253cc0ae24",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 541,
+        "width": 1100
+      },
+      "id": "cc9c14ad-ccc2-4e4c-838e-acfbc26dfd83",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        592
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![Slack](https://i.imgur.com/iKyMV0N.png)\n## Reporte final del análisis de phishing\nEn la fase final del flujo de trabajo, consolidamos el análisis en información accionable y lo reportamos a través de Slack.\n\nEl nodo “Not empty?” filtra los datos, asegurando que solo las URLs con un análisis completo avancen a la etapa de reporte. Este paso es crucial para evitar alertas basadas en datos incompletos, lo que podría llevar a decisiones incorrectas.\n\nEl nodo “sends slack message” es el punto final del flujo de trabajo, donde se compila un informe detallado y se publica en Slack. El mensaje incluye el asunto, remitente y fecha del correo analizado, junto con los informes de URLScan y VirusTotal. Además, proporciona un veredicto conciso sumando el número de indicadores maliciosos y sospechosos frente al total de comprobaciones realizadas, ofreciendo una indicación clara del nivel de amenaza potencial.\n\nEsta notificación en Slack sirve como alerta para que el equipo de ciberseguridad tome las acciones apropiadas, cumpliendo el objetivo del flujo de trabajo de proporcionar un análisis de amenazas de phishing rápido, preciso y eficiente.",
+        "height": 575.5779026440933,
+        "width": 1213.8313506082789
+      },
+      "id": "d50bd4a4-8df3-47d9-a125-6b3658f0296f",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        240,
+        1152
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "additionalFields": {
+          "filter": "isRead eq false"
+        }
+      },
+      "id": "5a9cef4b-a3d2-421b-b836-8521b9dc0706",
+      "name": "Get all unread messages",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "position": [
+        -608,
+        880
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![VirusTotal](https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/VirusTotal_logo.svg/320px-VirusTotal_logo.svg.png)\n## Análisis de URLs de phishing con VirusTotal\nEste segmento del flujo de trabajo utiliza las capacidades de VirusTotal para examinar URLs en busca de señales de phishing.\n\nEl nodo “VirusTotal: Scan URL” inicia el proceso enviando la URL a VirusTotal para su análisis. Una vez que se activa el escaneo, el flujo de trabajo continúa con el nodo “VirusTotal: Get report”, que recupera el informe de análisis detallado después de un intervalo de tiempo determinado, asegurando que los datos recibidos incluyan todos los hallazgos del escaneo.\n\nFinalmente, el nodo “Merge Reports” combina los resultados de URLScan.io y VirusTotal, alineando los datos lado a lado para obtener una visión completa. Esta fusión por posición es fundamental, ya que correlaciona el análisis de diferentes fuentes, proporcionando una evaluación de seguridad en capas de la URL en cuestión.",
+        "height": 540.6919228251508,
+        "width": 615.527819465977
+      },
+      "id": "d0ac7d33-b113-4a71-8916-7620f79ad828",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        592
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "86db2fe8-1381-4472-8df8-f4b4147e4e8e",
+      "name": "Merge Reports",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1504,
+        960
+      ],
+      "typeVersion": 2.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Has URL?": {
+      "main": [
+        [
+          {
+            "node": "URLScan: Scan URL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "VirusTotal: Scan URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No error?": {
+      "main": [
+        [
+          {
+            "node": "Merge Reports",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 1 Minute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not empty?": {
+      "main": [
+        [
+          {
+            "node": "sends slack message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as read": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Reports": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1 Minute": {
+      "main": [
+        [
+          {
+            "node": "URLScan: Get report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get all unread messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Find indicators of compromise",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not empty?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URLScan: Scan URL": {
+      "main": [
+        [
+          {
+            "node": "No error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URLScan: Get report": {
+      "main": [
+        [
+          {
+            "node": "Merge Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal: Scan URL": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal: Get report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal: Get report": {
+      "main": [
+        [
+          {
+            "node": "Merge Reports",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get all unread messages": {
+      "main": [
+        [
+          {
+            "node": "Mark as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find indicators of compromise": {
+      "main": [
+        [
+          {
+            "node": "Has URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Get all unread messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "6f844f89-ef16-4df9-813d-9e9ae829949c",
+  "meta": {
+    "instanceId": "10d6f318e060cfdcae3f8be16cecc1d487d64ea21ff69ed19ec3627f80aef7c6"
+  },
+  "id": "I-ez6KQsro1Yzu58IO0hT",
+  "tags": []
+}
